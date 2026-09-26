@@ -1,0 +1,92 @@
+#!/usr/bin/env node
+import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+import { serializeCsv } from "./csv.js";
+import { getSpending, parseRevolutCsv, summarizeSpending } from "./revolut.js";
+import type { SpendingSummary, Transaction } from "./revolut.js";
+
+type OutputFormat = "json" | "csv";
+
+function parseDateOption(value: string, option: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${option} must use YYYY-MM-DD format`);
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== value) {
+    throw new Error(`${option} must be a valid calendar date`);
+  }
+  return value;
+}
+
+export async function run(args: readonly string[]): Promise<string> {
+  const [command, file, ...options] = args;
+  if (!command || !file || !["transactions", "summary"].includes(command)) {
+    throw new Error("Usage: rmz-revolut-spending <transactions|summary> <statement.csv> [--from DATE] [--to DATE] [--format json|csv]");
+  }
+
+  let from: string | undefined;
+  let to: string | undefined;
+  let format: OutputFormat = "json";
+  for (let index = 0; index < options.length; index += 1) {
+    const option = options[index];
+    const value = options[index + 1];
+    if (option === "--from" || option === "--to" || option === "--format") {
+      if (!value || value.startsWith("--")) throw new Error(`Missing value for ${option}`);
+      if (option === "--from") from = parseDateOption(value, option);
+      if (option === "--to") to = parseDateOption(value, option);
+      if (option === "--format") {
+        if (value !== "json" && value !== "csv") throw new Error("--format must be json or csv");
+        format = value;
+      }
+      index += 1;
+    } else {
+      throw new Error(`Unknown option: ${option}`);
+    }
+  }
+  if (from && to && from > to) throw new Error("--from must be on or before --to");
+
+  const transactions = getSpending(
+    parseRevolutCsv(await readFile(file, "utf8")),
+    from,
+    to,
+  );
+  if (command === "summary") {
+    const summaries = summarizeSpending(transactions);
+    if (format === "json") return JSON.stringify(summaries, null, 2);
+    return serializeCsv(
+      ["currency", "transactionCount", "totalSpent"],
+      summaries.map((summary: SpendingSummary) => [
+        summary.currency,
+        summary.transactionCount,
+        summary.totalSpent,
+      ]),
+    );
+  }
+
+  if (format === "json") return JSON.stringify(transactions, null, 2);
+  return serializeCsv(
+    ["date", "description", "amount", "currency", "category", "type"],
+    transactions.map((transaction: Transaction) => [
+      transaction.date,
+      transaction.description,
+      transaction.amount,
+      transaction.currency,
+      transaction.category,
+      transaction.type,
+    ]),
+  );
+}
+
+async function main(): Promise<void> {
+  try {
+    process.stdout.write(`${await run(process.argv.slice(2))}\n`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`rmz-revolut-spending: error: ${message}\n`);
+    process.exitCode = 2;
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}
