@@ -11,14 +11,14 @@ const sample = [
   "Card Payment,Current,2025-02-01,,Groceries,-20.25,0,EUR,COMPLETED,Groceries",
 ].join("\r\n");
 
-test("parses quoted fields, escaped quotes, CRLF, and embedded newlines", () => {
+test("PRD-001: parses quoted fields, escaped quotes, CRLF, and embedded newlines", () => {
   assert.deepEqual(parseCsv('a,b\r\n"hello, ""world""","line 1\nline 2"\r\n'), [
     ["a", "b"],
     ['hello, "world"', "line 1\nline 2"],
   ]);
 });
 
-test("rejects unterminated quoted CSV fields", () => {
+test("PRD-001: rejects unterminated quoted CSV fields", () => {
   assert.throws(() => parseCsv('a,"unfinished'), /unterminated quoted field/);
 });
 
@@ -26,7 +26,7 @@ test("serializes CSV values with proper quoting", () => {
   assert.equal(serializeCsv(["name", "amount"], [['Cafe, "Main"', -12.5]]), 'name,amount\n"Cafe, ""Main""",-12.5');
 });
 
-test("imports Revolut statement transactions and supports a BOM", () => {
+test("PRD-001: imports statement transactions and supports a BOM", () => {
   const transactions = parseRevolutCsv(`\uFEFF${sample}`);
   assert.equal(transactions.length, 4);
   assert.deepEqual(transactions[0], {
@@ -40,7 +40,7 @@ test("imports Revolut statement transactions and supports a BOM", () => {
   });
 });
 
-test("uses started date when completed date is blank and handles missing optional columns", () => {
+test("PRD-001: uses started date when completed date is blank and handles missing optional columns", () => {
   const result = parseRevolutCsv("Started Date,Description,Amount\n2025-01-01,Shop,-1.25");
   assert.equal(result[0].date, "2025-01-01");
   assert.equal(result[0].currency, "");
@@ -50,11 +50,11 @@ test("returns an empty list for an empty file", () => {
   assert.deepEqual(parseRevolutCsv(""), []);
 });
 
-test("requires date, description, and amount columns", () => {
+test("PRD-001: requires date, description, and amount columns", () => {
   assert.throws(() => parseRevolutCsv("Date,Description\n2025-01-01,Shop"), /must include Date/);
 });
 
-test("rejects missing dates and invalid amounts with their CSV row numbers", () => {
+test("PRD-001: rejects missing dates and invalid amounts with their CSV row numbers", () => {
   assert.throws(
     () => parseRevolutCsv("Date,Description,Amount\n,Shop,-1"),
     /Missing date on CSV row 2/,
@@ -65,7 +65,7 @@ test("rejects missing dates and invalid amounts with their CSV row numbers", () 
   );
 });
 
-test("selects only completed negative transactions within inclusive date bounds", () => {
+test("PRD-002: selects only completed negative transactions within inclusive date bounds", () => {
   const transactions = parseRevolutCsv(sample);
   assert.deepEqual(
     getSpending(transactions, "2025-01-01", "2025-01-31").map(({ description }) => description),
@@ -73,7 +73,7 @@ test("selects only completed negative transactions within inclusive date bounds"
   );
 });
 
-test("summarizes totals by currency in sorted currency order", () => {
+test("PRD-003: summarizes totals by currency in sorted currency order", () => {
   const result = summarizeSpending([
     { date: "2025-01-01", description: "A", amount: -1.1, currency: "USD", state: "COMPLETED", category: "", type: "" },
     { date: "2025-01-01", description: "B", amount: -2.2, currency: "EUR", state: "COMPLETED", category: "", type: "" },

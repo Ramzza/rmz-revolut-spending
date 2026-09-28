@@ -22,14 +22,14 @@ async function withStatement(action: (path: string) => Promise<void>): Promise<v
   }
 }
 
-test("CLI outputs transactions as JSON by default", async () => {
+test("PRD-004: CLI outputs transactions as JSON by default", async () => {
   await withStatement(async (path) => {
     const result = JSON.parse(await run(["transactions", path])) as Array<{ description: string }>;
     assert.deepEqual(result.map(({ description }) => description), ["Groceries"]);
   });
 });
 
-test("CLI filters date range and outputs transaction CSV", async () => {
+test("PRD-004: CLI filters date range and outputs transaction CSV", async () => {
   await withStatement(async (path) => {
     const result = await run([
       "transactions", path, "--from", "2025-01-01", "--to", "2025-01-01", "--format", "csv",
@@ -38,7 +38,7 @@ test("CLI filters date range and outputs transaction CSV", async () => {
   });
 });
 
-test("CLI outputs summary JSON and CSV", async () => {
+test("PRD-004: CLI outputs summary JSON and CSV", async () => {
   await withStatement(async (path) => {
     const json = JSON.parse(await run(["summary", path])) as Array<{ totalSpent: number }>;
     assert.equal(json[0].totalSpent, 10);
@@ -49,7 +49,7 @@ test("CLI outputs summary JSON and CSV", async () => {
   });
 });
 
-test("CLI rejects invalid commands, options, and date ranges", async () => {
+test("PRD-004: CLI rejects invalid commands, options, and date ranges", async () => {
   await withStatement(async (path) => {
     await assert.rejects(run([]), /Usage:/);
     await assert.rejects(run(["other", path]), /Usage:/);

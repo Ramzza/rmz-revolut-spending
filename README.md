@@ -4,6 +4,8 @@ A local TypeScript CLI for extracting completed outflows from Revolut CSV
 account statements and summarizing spend by currency. Your statement stays on
 your machine; the tool does not connect to Revolut or transmit your data.
 
+See [PRD.md](PRD.md) for the product requirements and their test mappings.
+
 ## Requirements
 
 Node.js 22 or later.
