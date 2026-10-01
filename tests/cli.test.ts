@@ -11,11 +11,27 @@ const statement = [
   "2025-01-02,,Pending,-2.00,EUR,PENDING,Shopping,Card Payment",
 ].join("\n");
 
+const categoryBreakdownHtml = `
+<button data-event-key="action.analytics.transaction-breakdown.click">
+  <span>Groceries</span><span>1 transaction</span><span>-RON&nbsp;20.00</span><span>100%</span>
+</button>`;
+
 async function withStatement(action: (path: string) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), "rmz-revolut-spending-"));
   const path = join(directory, "statement.csv");
   try {
     await writeFile(path, statement);
+    await action(path);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+async function withHtml(action: (path: string) => Promise<void>): Promise<void> {
+  const directory = await mkdtemp(join(tmpdir(), "rmz-revolut-spending-"));
+  const path = join(directory, "spending.html");
+  try {
+    await writeFile(path, categoryBreakdownHtml);
     await action(path);
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -45,6 +61,21 @@ test("PRD-004: CLI outputs summary JSON and CSV", async () => {
     assert.equal(
       await run(["summary", path, "--format", "csv"]),
       "currency,transactionCount,totalSpent\nEUR,1,10",
+    );
+  });
+});
+
+test("PRD-005: CLI outputs extracted category RON amounts as JSON and CSV", async () => {
+  await withHtml(async (path) => {
+    const json = JSON.parse(await run(["categories", path])) as Array<{ category: string; ron: number }>;
+    assert.deepEqual(json, [{ category: "Groceries", ron: 20 }]);
+    assert.equal(
+      await run(["categories", path, "--format", "csv"]),
+      "category,ron\nGroceries,20",
+    );
+    await assert.rejects(
+      run(["categories", path, "--from", "2025-01-01"]),
+      /only supported for transactions and summary/,
     );
   });
 });

@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { serializeCsv } from "./csv.js";
 import { getSpending, parseRevolutCsv, summarizeSpending } from "./revolut.js";
+import { parseCategoryBreakdownHtml } from "./spending-html.js";
 import type { SpendingSummary, Transaction } from "./revolut.js";
+import type { CategorySpend } from "./spending-html.js";
 
 type OutputFormat = "json" | "csv";
 
@@ -20,8 +22,8 @@ function parseDateOption(value: string, option: string): string {
 
 export async function run(args: readonly string[]): Promise<string> {
   const [command, file, ...options] = args;
-  if (!command || !file || !["transactions", "summary"].includes(command)) {
-    throw new Error("Usage: rmz-revolut-spending <transactions|summary> <statement.csv> [--from DATE] [--to DATE] [--format json|csv]");
+  if (!command || !file || !["transactions", "summary", "categories"].includes(command)) {
+    throw new Error("Usage: rmz-revolut-spending <transactions|summary|categories> <statement.csv|spending.html> [--from DATE] [--to DATE] [--format json|csv]");
   }
 
   let from: string | undefined;
@@ -45,36 +47,57 @@ export async function run(args: readonly string[]): Promise<string> {
   }
   if (from && to && from > to) throw new Error("--from must be on or before --to");
 
-  const transactions = getSpending(
-    parseRevolutCsv(await readFile(file, "utf8")),
-    from,
-    to,
-  );
-  if (command === "summary") {
-    const summaries = summarizeSpending(transactions);
-    if (format === "json") return JSON.stringify(summaries, null, 2);
-    return serializeCsv(
-      ["currency", "transactionCount", "totalSpent"],
-      summaries.map((summary: SpendingSummary) => [
-        summary.currency,
-        summary.transactionCount,
-        summary.totalSpent,
-      ]),
+  let output: string;
+  if (command === "categories") {
+    if (from || to) {
+      throw new Error("--from and --to are only supported for transactions and summary");
+    }
+    const categories = parseCategoryBreakdownHtml(await readFile(file, "utf8"));
+    if (format === "json") {
+      output = JSON.stringify(categories, null, 2);
+    } else {
+      output = serializeCsv(
+        ["category", "ron"],
+        categories.map((category: CategorySpend) => [category.category, category.ron]),
+      );
+    }
+  } else {
+    const transactions = getSpending(
+      parseRevolutCsv(await readFile(file, "utf8")),
+      from,
+      to,
     );
+    if (command === "summary") {
+      const summaries = summarizeSpending(transactions);
+      if (format === "json") {
+        output = JSON.stringify(summaries, null, 2);
+      } else {
+        output = serializeCsv(
+          ["currency", "transactionCount", "totalSpent"],
+          summaries.map((summary: SpendingSummary) => [
+            summary.currency,
+            summary.transactionCount,
+            summary.totalSpent,
+          ]),
+        );
+      }
+    } else if (format === "json") {
+      output = JSON.stringify(transactions, null, 2);
+    } else {
+      output = serializeCsv(
+        ["date", "description", "amount", "currency", "category", "type"],
+        transactions.map((transaction: Transaction) => [
+          transaction.date,
+          transaction.description,
+          transaction.amount,
+          transaction.currency,
+          transaction.category,
+          transaction.type,
+        ]),
+      );
+    }
   }
-
-  if (format === "json") return JSON.stringify(transactions, null, 2);
-  return serializeCsv(
-    ["date", "description", "amount", "currency", "category", "type"],
-    transactions.map((transaction: Transaction) => [
-      transaction.date,
-      transaction.description,
-      transaction.amount,
-      transaction.currency,
-      transaction.category,
-      transaction.type,
-    ]),
-  );
+  return output;
 }
 
 async function main(): Promise<void> {

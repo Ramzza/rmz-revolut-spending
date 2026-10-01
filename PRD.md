@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Process locally exported Revolut CSV statements into filtered transaction lists and spending summaries.
+Process locally exported Revolut CSV statements into filtered transaction lists and spending summaries, and extract category totals from saved Revolut spending breakdown HTML.
 
 ## Requirements
 
@@ -14,3 +14,5 @@ Process locally exported Revolut CSV statements into filtered transaction lists 
   **Verification:** `tests/revolut.test.ts::PRD-003: summarizes totals by currency in sorted currency order`.
 - **PRD-004 - CLI outputs:** Provide transaction and summary commands with JSON or CSV output, and reject invalid options or dates.
   **Verification:** `tests/cli.test.ts` tests prefixed `PRD-004`.
+- **PRD-005 - Extract HTML category breakdown:** Parse a local Revolut spending breakdown HTML file into category labels and non-negative numeric RON amounts, excluding the displayed minus sign, transaction counts, and percentages. Support JSON and CSV output, and report an error when no category breakdown can be parsed.
+  **Verification:** `tests/spending-html.test.ts` and `tests/cli.test.ts` tests prefixed `PRD-005`.
